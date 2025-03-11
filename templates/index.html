@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Analysis AI</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body class="dark-theme">
+    <div class="container">
+        <h2 class="text-center text-light">Stock Analysis AI</h2>
+        <form id="stockForm">
+            <div class="mb-3">
+                <label for="ticker" class="form-label text-light">Enter Stock Ticker:</label>
+                <input type="text" class="form-control bg-dark text-light" id="ticker" name="ticker" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">
+                <span id="button-text">Analyze</span>
+                <span id="loading-spinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+            </button>
+        </form>
+
+        <div class="result-box mt-4" id="resultBox">
+            <h4 class="text-light">Analysis Result</h4>
+            <div id="resultContent"></div>
+            <div id="stockGraphContainer">
+                <div id="stockGraph" class="stock-graph"></div>
+            </div>
+            <div id="disclaimer"></div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
