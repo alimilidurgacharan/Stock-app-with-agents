@@ -19,7 +19,7 @@ app = Flask(__name__)
 # Define Stock Analysis Agent
 stock_analysis_agent = Agent(
     name='Stock Analysis Agent',
-    model=Groq(id="deepseek-r1-distill-llama-70b", api_key=api_key
+    model=Groq(id="deepseek-r1-distill-llama-70b", api_key="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"
                ),
     tools=[
         YFinanceTools(stock_price=True, analyst_recommendations=True, company_info=True),
