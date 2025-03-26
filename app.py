@@ -1,8 +1,12 @@
 from flask import Flask, render_template, request, jsonify
 from agno.agent import Agent
 from agno.models.groq import Groq
+from agno.models.openai import OpenAIChat
 from agno.tools.duckduckgo import DuckDuckGoTools
+from duckduckgo_search import DDGS
+# from agno.tools import duckduckgo_news
 from agno.tools.yfinance import YFinanceTools
+from langchain_community.utilities import GoogleSerperAPIWrapper
 import os
 import re
 import yfinance as yf
@@ -10,29 +14,39 @@ import markdown
 from dotenv import load_dotenv
 import json
 
+
 load_dotenv()
 
+# open_api = os.getenv('OPENAI_API_KEY')
 groq_api = os.getenv('GROQ_API_KEY')
 
 app = Flask(__name__)
 
-# Define Stock Analysis Agent
+
+
+
+# Define the Stock Analysis Agent
 stock_analysis_agent = Agent(
     name='Stock Analysis Agent',
-    model=Groq(id="deepseek-r1-distill-llama-70b", api_key="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"
-               ),
+    # model=OpenAIChat(id="gpt-4o", api_key=open_api),
+    model=Groq(id="llama-3.3-70b-versatile", api_key=groq_api),
     tools=[
         YFinanceTools(stock_price=True, analyst_recommendations=True, company_info=True),
         DuckDuckGoTools()
     ],
     instructions=[
-        "Use DuckDuckGoTools for real-time stock-related news.",
+        "Use the DuckDuckGoNewsTool for real-time stock-related news.",
         "Use YFinanceTools for stock prices, company details, and analyst recommendations.",
-        "Provide top 3 recent news headlines with short summaries.",
+        "Use DuckDuckGoTools for general web searches related to stocks or finance trends.",
+        "Provide the top 3 recent news headlines with short summaries.",
     ],
     show_tool_calls=False,
     markdown=True
 )
+# def get_recent_news(query: str):
+#     agent = Agent(tools=[duckduckgo_news])
+#     response = agent.run(f"Search recent news about {query}")
+#     return response
 
 @app.route('/')
 def home():
@@ -48,10 +62,18 @@ def analyze():
         stock_data = yf.Ticker(ticker)
         stock_info = stock_data.info
 
+        ddgs = DDGS()
+
+        query = ticker
+        news_results = ddgs.news(query, max_results=3)
+
         # Fetch real-time stock price
         current_price = stock_info.get('regularMarketPrice', None)
         after_hours_price = stock_info.get('postMarketPrice', None)
         previous_close = stock_info.get('previousClose', None)
+        Volume = stock_info.get('volume', None)
+        Revenue = stock_info.get('totalRevenue', None)
+        net_income = stock_info.get('netIncomeToCommon', None)
 
         # Handle missing real-time price
         if current_price is None:
@@ -78,7 +100,10 @@ def analyze():
         - If real-time price is missing, use the last closing price with a note: "**Note: Real-time price data unavailable. Using last closing price instead.**"
         - Ensure the response is in **clean Markdown format** without any extraneous information.
         - Ensure the **Recent News** section always follows this exact format with numbered news items, headlines, summaries, and sources as a website links.
-        - Ensure the **Recent News** summary should be minimun of 3 lines.
+        - Ensure the **Recent News** summary should be minimun of ten lines.
+        - Ensure you use GoogleSerperAPIWrapper for news source donot give random link in source only https link without brackets and all. 
+        - Ensure to give same response for each call donot give different response.
+        - Make sure to provide accurate results by conducting a thorough search
 
         Strictly Return your response in **clean Json format**.
         Dont change any key values in the json.and also dont include any other keys.
@@ -91,15 +116,15 @@ def analyze():
                 "Sector": ""
                 "Industry": ""
                 "Key Financials":{{
-                    "Revenue (TTM)": ""
-                    "Net Income (TTM)": ""
+                    "Revenue (TTM)": "{Revenue}"
+                    "Net Income (TTM)": "{net_income}"
                     "EPS (TTM)": ""
                 }}
             }},
             "Stock Performance": {{
                 {price_message}
                 "52-Week Range" : ""
-                "Volume (Avg.)" : ""
+                "Volume (Avg.)" : "{Volume}"
                 "Market Cap" : ""
             }},
             "Recent News": [
@@ -130,8 +155,6 @@ def analyze():
             "Technical Trend Analysis" : {{
                 "50-Day Moving Average" : ""
                 "200-Day Moving Average" : ""
-                "RSI" : ""
-                "MACD" : ""
             }},
             "Final Buy/Hold/Sell Recommendation" : {{
                 "Recommendation" : ""
@@ -243,6 +266,29 @@ def analyze():
 
             formatted_text += "</div>"
 
+
+
+
+            # Key Financials and Stock Performance
+            # financials = stock_data_json.get('Company Overview', {}).get('Key Financials', {})
+            # perf = stock_data_json.get('Stock Performance', {})
+
+            # formatted_text += """
+            #     <div class="box">
+                    
+            #         <h2>Stock Performance</h2>
+
+            # """.format(
+            #     financials.get('Revenue (TTM)', 'N/A'),
+            #     financials.get('Net Income (TTM)', 'N/A'),
+            #     financials.get('EPS (TTM)', 'N/A')
+            # )
+
+            # for key, value in perf.items():
+            #     formatted_text += f"<p><strong>{key}:</strong> {value}</p>"
+
+            # formatted_text += "</div>"
+
             # Analyst Ratings & Technical Trend Analysis
             ratings = stock_data_json.get('Analyst Ratings', {})
             tech = stock_data_json.get('Technical Trend Analysis', {})
@@ -299,6 +345,7 @@ def analyze():
             cleaned_content = re.sub(r'```.*?```', '', markdown_content, flags=re.DOTALL)
             cleaned_content = re.sub(r"</?p>|</code>|<code>|>", "", cleaned_content)
             formatted_response = re.sub(r'<table>', '<table class="table table-bordered table-striped">', cleaned_content)
+            print(formatted_response)
 
         return jsonify({
             'result': formatted_response,  # Plain text
