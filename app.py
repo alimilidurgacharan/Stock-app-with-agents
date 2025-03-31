@@ -13,23 +13,24 @@ import yfinance as yf
 import markdown
 from dotenv import load_dotenv
 import json
+import openai
+# from prediction import earnings_predictions
 
 
 load_dotenv()
 
-# open_api = os.getenv('OPENAI_API_KEY')
-groq_api = os.getenv('GROQ_API_KEY')
+open_api = os.getenv('OPENAI_API_KEY')
+
+# groq_api = os.getenv('GROQ_API_KEY')
 
 app = Flask(__name__)
-
-
 
 
 # Define the Stock Analysis Agent
 stock_analysis_agent = Agent(
     name='Stock Analysis Agent',
-    # model=OpenAIChat(id="gpt-4o", api_key=open_api),
-    model=Groq(id="llama-3.3-70b-versatile", api_key=groq_api),
+    model=OpenAIChat(id="gpt-4o", api_key=open_api),
+    # model=Groq(id="llama-3.3-70b-versatile", api_key=groq_api),
     tools=[
         YFinanceTools(stock_price=True, analyst_recommendations=True, company_info=True),
         DuckDuckGoTools()
@@ -85,7 +86,7 @@ def analyze():
             price_message += f"\n📉 **After-Hours Price**: ${after_hours_price:.2f}"
 
         structured_prompt = f"""
-        You are a **Stock Analysis AI**. Your job is to analyze **{ticker}** and generate a structured stock report every time, following this exact format:
+        You are a **Stock MANUS Analysis AI**. Your job is to analyze **{ticker}** and generate a structured stock report every time, following this exact format:
 
         📌 **Instructions**:
         - Use **YFinanceTools** to get:
@@ -104,6 +105,12 @@ def analyze():
         - Ensure you use GoogleSerperAPIWrapper for news source donot give random link in source only https link without brackets and all. 
         - Ensure to give same response for each call donot give different response.
         - Make sure to provide accurate results by conducting a thorough search
+
+        - Assess major risk factors and potential headwinds
+        - Develop bull case scenario as a case study and price target and make sure that give for differnet interval of time like 7 days, 15 days, 30 days, 60 days and 90 days by using **perplexity AI ** analysing previous 3yrs market trend from differnt websited and give you best output.
+        - Develop bear case scenario as a case studyand price target and make sure that give for differnet interval of time like 7 days, 15 days, 30 days, 60 days and 90 days by using **perplexity AI ** analysing previous 3yrs market trend from differnt websited and give you best output.
+        - Create recommendations for different investor types
+
 
         Strictly Return your response in **clean Json format**.
         Dont change any key values in the json.and also dont include any other keys.
@@ -159,6 +166,27 @@ def analyze():
             "Final Buy/Hold/Sell Recommendation" : {{
                 "Recommendation" : ""
                 "Reasoning" : ""
+            }}
+            {{
+                # ... existing keys ...
+                "risk_factors": [
+                    "Risk Factor 1",
+                    "Risk Factor 2",
+                    "Risk Factor 3"
+                ],
+                "bull_case": {{
+                    "scenario": "Potential bullish scenario description",
+                    "price_target": "Bullish price target"
+                }},
+                "bear_case": {{
+                    "scenario": "Potential bearish scenario description",
+                    "price_target": "Bearish price target"
+                }},
+                "investor_recommendations": {{
+                    "conservative_investors": "Recommendation for risk-averse investors",
+                    "moderate_investors": "Recommendation for balanced investors",
+                    "aggressive_investors": "Recommendation for high-risk tolerance investors"
+                }}
             }}
         }}
         Note: please dont display any other information outoff the json response
@@ -333,6 +361,60 @@ def analyze():
             rec = stock_data_json.get('Final Buy/Hold/Sell Recommendation', {})
             formatted_text += f"<p><strong>Recommendation:</strong> {rec.get('Recommendation', 'N/A')}</p>"
             formatted_text += f"<p><strong>Reasoning:</strong> {rec.get('Reasoning', 'N/A')}</p>"
+
+            formatted_text += "<h2>RISK FACTORS</h2>"
+            for factor in stock_data_json.get('risk_factors', []):
+                formatted_text += f"<p>• {factor}</p>"
+
+            # Bull Case
+            bull_case = stock_data_json.get('bull_case', {})
+            formatted_text += """
+            <h2>BULL CASE SCENARIO</h2>
+            <div class="box">
+                <p><strong>Scenario:</strong> {}</p>
+                <p><strong>Price Target:</strong> {}</p>
+            </div>
+            """.format(
+                bull_case.get('scenario', 'N/A'),
+                bull_case.get('price_target', 'N/A')
+            )
+
+            # Bear Case
+            bear_case = stock_data_json.get('bear_case', {})
+            formatted_text += """
+            <h2>BEAR CASE SCENARIO</h2>
+            <div class="box">
+                <p><strong>Scenario:</strong> {}</p>
+                <p><strong>Price Target:</strong> {}</p>
+            </div>
+            """.format(
+                bear_case.get('scenario', 'N/A'),
+                bear_case.get('price_target', 'N/A')
+            )
+
+            # Investor Recommendations
+            investor_rec = stock_data_json.get('investor_recommendations', {})
+            formatted_text += """
+            <h2>INVESTOR RECOMMENDATIONS</h2>
+            <div class="container">
+                <div class="box">
+                    <h3>Conservative Investors</h3>
+                    <p>{}</p>
+                </div>
+                <div class="box">
+                    <h3>Moderate Investors</h3>
+                    <p>{}</p>
+                </div>
+                <div class="box">
+                    <h3>Aggressive Investors</h3>
+                    <p>{}</p>
+                </div>
+            </div>
+            """.format(
+                investor_rec.get('conservative_investors', 'N/A'),
+                investor_rec.get('moderate_investors', 'N/A'),
+                investor_rec.get('aggressive_investors', 'N/A')
+            )
             
             # Replace the markdown processing with our formatted text
             formatted_response = formatted_text
